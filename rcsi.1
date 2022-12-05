@@ -1,0 +1,65 @@
+.de Id
+.ds Rv \\$3
+.ds Dt \\$4
+..
+.Id $Id: rcsi.1,v 1.2 1994/11/02 13:58:50 cmb Exp $
+.ds r \s-1RCS\s0
+.if n .ds - \%--
+.if t .ds - \(em
+.TH RCSI 1 \*(Dt 
+.SH NAME
+rcsi \- a program to display information about RCS files
+.SH SYNOPSIS
+.B rcsi
+[
+.B \-h \-v \-l \-u \-d \-a \-r
+]
+
+.SH DESCRIPTION
+.B rcsi
+allows the status of RCS files in a directory to be ascertained
+quickly. It displays a list of the files in the current directory
+together with their RCS status \- for example, locked or unlocked,
+revised or unchanged, details on any locks held, and so on.
+
+.B \-h
+or
+.B \-\-help
+displays a useful summary of the options available.
+
+.B \-v
+or
+.B \-\-version
+displays the version number of the program.
+
+.B \-l
+or
+.B \-\-locked
+only includes locked RCS files in the output.
+
+.B \-u
+or
+.B \-\-unlocked
+only includes unlocked RCS files in the output.
+
+.B \-d
+or
+.B \-a
+or
+.B \-\-dot
+includes files beginning with a dot to be included in the output. 
+
+.B \-r
+or
+.B \-\-rcsonly
+limits the output to only those files maintained under RCS.
+
+.SH IDENTIFICATION
+Author: Colin M. Brough.
+.br
+Revision Number: \*(Rv; Release Date: \*(Dt.
+Copyright (C) 1994 Colin Brough
+
+.SH "SEE ALSO"
+rcs(1), ci(1), co(1), rcsdiff(1), rlog(1), ident(1), merge(1),
+rcsmerge(1) 
