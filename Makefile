@@ -3,9 +3,12 @@
 #	Makefile for rcsi
 #
 #----------------------------------------------------------------------
-# $Id: Makefile,v 1.9 1994/11/02 14:00:05 cmb Exp $
+# $Id: Makefile,v 1.10 1994/11/09 16:52:33 cmb Exp $
 #
 # $Log: Makefile,v $
+# Revision 1.10  1994/11/09 16:52:33  cmb
+# Changed tar file creation to version 0.2
+#
 # Revision 1.9  1994/11/02 14:00:05  cmb
 # Added manual page to creation of tar file.
 #
@@ -44,13 +47,13 @@ solaris	irix osf1	: rcsi.c
 #	in-built compression via gzip.
 
 tar	:
-	rm -rf rcsi-0.1
-	mkdir rcsi-0.1
-	cp COPYING README rcsi.c rcsi.1 Makefile rcsi-0.1
-	$(TAR) czvf rcsi-0.1.tar.gz rcsi-0.1
+	rm -rf rcsi-0.2
+	mkdir rcsi-0.2
+	cp COPYING README rcsi.c rcsi.1 Makefile rcsi-0.2
+	$(TAR) czvf rcsi-0.2.tar.gz rcsi-0.2
 
 #----------------------------------------------------------------------
 #	Get rid of all the guff that accumulates...
 
 clean:
-	rm -rf rcsi *~ rcsi-0.1 rcsi-0.1.tar.gz
+	rm -rf rcsi *~ rcsi-0.2 rcsi-0.2.tar.gz

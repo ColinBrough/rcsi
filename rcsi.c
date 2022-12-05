@@ -22,9 +22,17 @@
  *	send them to: 'cmb@epcc.ed.ac.uk'
  *
  *----------------------------------------------------------------------
- * $Id: rcsi.c,v 1.15 1994/11/02 13:18:13 cmb Exp $
+ * $Id: rcsi.c,v 1.17 1994/11/09 16:53:50 cmb Exp $
  *
  * $Log: rcsi.c,v $
+ * Revision 1.17  1994/11/09 16:53:50  cmb
+ * Changes to allow files to be read from the command line completed, including
+ * facility to note files given on command line that don't exist.
+ *
+ * Revision 1.16  1994/11/09 16:19:43  cmb
+ * Added the ability to take command line arguments - the help message hasn't
+ * been updated yet.... and there hasn't been much checking yet!
+ *
  * Revision 1.15  1994/11/02 13:18:13  cmb
  * Sorted some duff logic in 'tree_insert' so that infinite loops don't occur
  * if it doesn't know how to modify the class for a file with an entry in
@@ -161,12 +169,21 @@ enum tokens
 /*----------------------------------------------------------------------
  * Now for some of my own additional datatypes.
  *
- * The first one is the structure/tree into which filenames are colllected.
+ * The first one is the enumeration covering the 'types' of files rcsi
+ * deals with:
+ *	RCSI_dir	Directories
+ *	RCSI_RCS	An RCS ,v file
+ *	RCSI_nonRCS	A normal file, not necessarily under the control of RCS
+ *	RCSI_work	RCS working file - i.e. file and ,v file both exist
+ *	RCSI_other	A link, or socket, or something
+ *	RCSI_fail	No file exists.
+ *
+ * The second one is the structure/tree into which filenames are colllected.
  *----------------------------------------------------------------------*/
 
 typedef enum FileClass
 {
-	RCSI_dir, RCSI_RCS, RCSI_nonRCS, RCSI_work, RCSI_other
+	RCSI_dir, RCSI_RCS, RCSI_nonRCS, RCSI_work, RCSI_other, RCSI_fail
 } FileClass;
 
 typedef struct Tnode
@@ -290,6 +307,7 @@ int	g_changed = false,	/* true => display only changed RCS files */
 	g_locked = false,	/*  "   =>    "     "   locked RCS    "   */
 	g_unlocked = false,	/*  "   =>    "     "   unlocked RCS  "   */
 	g_dot = false,		/*  "   => also include dot files	  */
+	g_fileargs = false,	/* Are there filename arguments?	*/
 	g_RCSdir = true;	/* Normally an RCS dir is present...	*/
 
 char	g_spaces[FILENAME_MAX];	/* Array of spaces... for printing	*/
@@ -298,7 +316,7 @@ char	g_spaces[FILENAME_MAX];	/* Array of spaces... for printing	*/
 				 * version number, last bit is generated
 				 * by RCS.
 				 */
-char	g_version[] = "0.1  ($Id: rcsi.c,v 1.15 1994/11/02 13:18:13 cmb Exp $)";
+char	g_version[] = "0.2  ($Id: rcsi.c,v 1.17 1994/11/09 16:53:50 cmb Exp $)";
 
 /*----------------------------------------------------------------------
  *
@@ -316,6 +334,7 @@ void		p_node (Tnode *t);
 void		print_tree (void);
 FileClass	determine_class (char *fname);
 void		read_files (void);
+void		process_filearg(char *fname);
 int		look_for (char *target, FILE *file_p);
 void		skip_to (char *keyword, FILE *rcsfile_p);
 enum markers	trymatch (char const *string);
@@ -678,11 +697,18 @@ void p_node(Tnode *t)
 		}
 		break;
 
+	case RCSI_fail:
+		if ( ! ( g_changed || g_rcsonly || g_locked || g_unlocked ))
+		{
+			p_name(t);
+			printf("( ** non-existent ** )\n");
+		}
+		break;
 	default:
 		if ( ! ( g_changed || g_rcsonly || g_locked || g_unlocked ))
 		{
 			p_name(t);
-			printf("**unknown**");
+			printf("( ** unknown ** )\n");
 		}
 		break;
 	}
@@ -722,43 +748,98 @@ FileClass determine_class(char *fname)
 	struct stat buf;
 	if (stat(fname, &buf) == -1)
 	{
-		printf("Failed to stat(%s)\n", fname);
-		exit(-1);
-	}
-	if (S_ISREG(buf.st_mode))
-	{
-		/* Its a regular file */
-		if (is_rcs_filename(fname))
-		{
-			class = RCSI_RCS;
-		}
-		else
-		{
-			class = RCSI_nonRCS;
-		}
-	}
-	else if (S_ISDIR(buf.st_mode))
-	{
-		/* Its a directory */
-		class = RCSI_dir;
-	}
-	else if ((S_ISLNK(buf.st_mode))  ||
-		 (S_ISCHR(buf.st_mode))  ||
-		 (S_ISBLK(buf.st_mode))  ||
-		 (S_ISFIFO(buf.st_mode)) ||
-		 (S_ISSOCK(buf.st_mode)))
-	{
-		/* Its a scoket */
-		class = RCSI_other;
+		class = RCSI_fail;
 	}
 	else
 	{
-		/* Dear only knows what it is! */
-		printf("Unknown file type!\n");
-		exit(-1);
+		if (S_ISREG(buf.st_mode))
+		{
+			/* Its a regular file */
+			if (is_rcs_filename(fname))
+			{
+				class = RCSI_RCS;
+			}
+			else
+			{
+				class = RCSI_nonRCS;
+			}
+		}
+		else if (S_ISDIR(buf.st_mode))
+		{
+			/* Its a directory */
+			class = RCSI_dir;
+		}
+		else if ((S_ISLNK(buf.st_mode))  ||
+			 (S_ISCHR(buf.st_mode))  ||
+			 (S_ISBLK(buf.st_mode))  ||
+			 (S_ISFIFO(buf.st_mode)) ||
+			 (S_ISSOCK(buf.st_mode)))
+		{
+			/* Its a scoket */
+			class = RCSI_other;
+		}
+		else
+		{
+			/* Dear only knows what it is! */
+			printf("Unknown file type!\n");
+			exit(-1);
+		}
 	}
+	
 	return(class);
 }	
+
+/*------------------------------------------------------------------------
+ * process_filearg	Routine to process a file argument to rcsi and 
+ *			insert it into the tree data structure.
+ *------------------------------------------------------------------------*/
+
+void process_filearg(char *fname)
+{
+	FileClass class;
+	struct stat buf;
+	char *rcsfname;
+	
+	if ((rcsfname = (char *) malloc (strlen(fname) + 7)) == 0)
+	{
+		printf("malloc for constructing RCS file name failed\n");
+		exit(-1);
+	}
+	
+	g_fileargs = true;	/* We have got a filename argument	*/
+	
+	class = determine_class(fname);
+	if (class == RCSI_RCS)
+	{
+		fname[strlen(fname)-2] = '\0';
+	}
+	else if (class == RCSI_nonRCS)
+	{
+		if (g_RCSdir)
+		{
+			sprintf(rcsfname, "RCS/%s,v", fname);
+			if (stat(rcsfname, &buf) == 0)
+			{
+				if (S_ISREG(buf.st_mode))
+				{
+					class = RCSI_work;
+				}
+			}
+		}
+		if (class == RCSI_nonRCS)
+		{
+			sprintf(rcsfname, "%s,v", fname);
+			if (stat(rcsfname, &buf) == 0)
+			{
+				if (S_ISREG(buf.st_mode))
+				{
+					class = RCSI_work;
+				}
+			}
+		}
+	}
+	tree_insert(fname, class);
+}			
 
 /*----------------------------------------------------------------------
  * read_files		Development only routine to read in the files in
@@ -806,14 +887,19 @@ void read_files(void)
 	 * back here...
 	 *--------------------------------------------------------------*/
 
-	if ((getcwd(pathname,PATH_MAX)) == NULL)
+	if (g_RCSdir)			/* If the RCS directory exists	*/
 	{
-		printf("getcwd failed: %s\n", pathname);
-		exit(-1);
-	}
-	
-	if (chdir("RCS") == 0)
-	{
+		if ((getcwd(pathname,PATH_MAX)) == NULL)
+		{
+			printf("getcwd failed: %s\n", pathname);
+			exit(-1);
+		}
+		if (chdir("RCS") != 0)
+		{
+			printf("RCS directory exists, but can't cd into it\n");
+			exit(-1);
+		}
+		
 		if ((dir = opendir(".")) == NULL)
 		{
 			printf("Failed to open RCS sub-dir\n");
@@ -847,10 +933,6 @@ void read_files(void)
 			printf("Failed to return to current dir\n");
 			exit(-1);
 		}
-	}
-	else		/* There isn't an RCS sub-directory	*/
-	{
-		g_RCSdir = false;
 	}
 }
 
@@ -1709,6 +1791,7 @@ void sig_handle(int sig)
 int main(int argc, char *argv[])
 {
 	int current_arg;
+	struct stat buf;
 	
 	/*--------------------------------------------------------------
 	 * Don't think this is necessary - maybe remove it later. Maybe
@@ -1720,6 +1803,27 @@ int main(int argc, char *argv[])
 	{
 		printf("Failed to install signal handler\n");
 		exit(-1);
+	}
+
+	/*----------------------------------------------------------------
+	 * First stat the RCS directory to see if it is present.
+	 *----------------------------------------------------------------*/
+
+	if (stat("RCS", &buf) == 0)
+	{
+		if (S_ISDIR(buf.st_mode))
+		{
+			/* Its a directory */
+			g_RCSdir = true;
+		}
+		else
+		{
+			g_RCSdir = false;
+		}
+	}
+	else
+	{
+		g_RCSdir = false;
 	}
 
 	/*----------------------------------------------------------------
@@ -1777,7 +1881,7 @@ int main(int argc, char *argv[])
 			 (strcmp(argv[current_arg], "--help") == 0))
 		{
 			printf("rcsi: Check the status of RCS files. Usage: "
-			       "rcsi [options]\n");
+			       "rcsi [options] [filenames]\n");
 			printf("-h --help      This message\n");
 			printf("-v --version   Display the version number\n");
 			printf("-c --changed   Include only RCS files that "
@@ -1793,20 +1897,27 @@ int main(int argc, char *argv[])
 		}
 		else
 		{
-			printf("Unrecognised argument: try 'rcsi --help'\n");
-			exit(-1);
+			/*------------------------------------------------
+			 * Must be a filename argument.
+			 *------------------------------------------------*/
+			process_filearg(argv[current_arg]);
+			
 		}
 		current_arg++;
 	}
 
 	/*----------------------------------------------------------------
-	 * Now for the real processing - read the files in and store them
-	 * in a tree-like data-structure. This is where the correlation
-	 * between RCS and working files is done. Then print the resulting
-	 * tree.
+	 * Now for the real processing - read the files in (if necessary)
+	 * and store them in a tree-like data-structure. This is where the 
+	 * correlation between RCS and working files is done. Then print 
+	 * the resulting tree.
 	 *----------------------------------------------------------------*/
 
-	read_files();
+	if (!g_fileargs)
+	{
+		read_files();
+	}
+	
 	print_tree();
 
 	exit(0);
