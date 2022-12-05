@@ -2,7 +2,7 @@
 .ds Rv \\$3
 .ds Dt \\$4
 ..
-.Id $Id: rcsi.1,v 1.4 1994/11/16 17:20:53 cmb Exp $
+.Id $Id: rcsi.1,v 1.8 2012/12/17 12:21:30 cmb Exp $
 .ds r \s-1RCS\s0
 .if n .ds - \%--
 .if t .ds - \(em
@@ -12,7 +12,9 @@ rcsi \- a program to display information about RCS files
 .SH SYNOPSIS
 .B rcsi
 [
-.B \-h \-v \-l \-u \-d \-a \-r
+.B \-h \-\-help \-v \-\-version \-c \-\-changed \-l \-\-locked \-u
+.B \-\-unlocked \-d \-a \-\-dot \-r \-\-rcsonly \-n \-\-not\-rcs
+.B \-\-color \-\-no\-color
 ]
 [
 .B filenames
@@ -36,6 +38,12 @@ displays a useful summary of the options available.
 or
 .B \-\-version
 displays the version number of the program.
+
+.B \-c
+or
+.B \-\-changed
+displays only those files which have changed since since the last
+check\-in.
 
 .B \-l
 or
@@ -61,13 +69,54 @@ or
 .B \-\-rcsonly
 limits the output to only those files maintained under RCS.
 
+.B \-n
+or
+.B \-\-not\-rcs
+limits the output to only those files
+.B not
+\-maintained under RCS.
+
+.B \-f
+or
+.B \-\-filenames
+output does not have any formatting, listing only the selected
+filenames, for instance so that they may be used as arguments to some
+other program.
+
+.B \-\-colo[u]r
+Use colour to highlight the files. This is the default \- terminal
+type is
+.B not
+checked!! For example, files maintained under RCS which are currently
+unlocked and unchanged are in green, while locked, unchanged files are
+in bold green. Modified files are in bold red.
+
+.B \-\-no\-colo[u]r
+Don't use colour to highlight the files.
+
+.SH BUGS
+
+I'm pretty sure there is a bug where
+.B rcsi
+reports a file as changed when it is not. This only occurs rarely, and
+I haven't been able to track it down \- I'm pretty sure it arises in
+some situations where there are '@' characters in the file.
+
+The implementation of
+.B rcsi
+is less than elegant \- large chunks of header files, type definitions
+and the like from the RCS sources are present in the
+.B rcsi.c
+source. But I'm not aware of anyone ever have made a library out of
+the RCS sources, so...
+
 .SH IDENTIFICATION
-Author: Colin M. Brough.
+Author: Colin Brough. (Colin.Brough@blueyonder.co.uk)
 .br
 Revision Number: \*(Rv; Release Date: \*(Dt.
-Copyright (C) 1994 Colin Brough
+Copyright (C) 1994-2012 Colin Brough
 
-This manual page covers rcsi version 0.3.
+This manual page covers rcsi version 0.6.
 
 .SH "SEE ALSO"
 rcs(1), ci(1), co(1), rcsdiff(1), rlog(1), ident(1), merge(1),
