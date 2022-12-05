@@ -1,4 +1,4 @@
-This directory contains complete sources for rcsi version 0.2
+This directory contains complete sources for rcsi version 0.3
 ----------------------------------------------------------------------
 
 	rcsi is a program to give information about RCS files.
@@ -19,7 +19,7 @@ You should have received a copy of the GNU General Public License
 along with rcsi; see the file COPYING.  If not, write to the Free
 Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
 
-$Id: README,v 1.4 1994/11/09 16:53:01 cmb Exp $
+$Id: README,v 1.5 1994/11/16 17:20:37 cmb Exp $
 
 ----------------------------------------------------------------------
 

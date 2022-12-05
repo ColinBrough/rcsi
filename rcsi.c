@@ -22,9 +22,16 @@
  *	send them to: 'cmb@epcc.ed.ac.uk'
  *
  *----------------------------------------------------------------------
- * $Id: rcsi.c,v 1.17 1994/11/09 16:53:50 cmb Exp $
+ * $Id: rcsi.c,v 1.19 1994/11/16 13:38:47 cmb Exp $
  *
  * $Log: rcsi.c,v $
+ * Revision 1.19  1994/11/16 13:38:47  cmb
+ * Fixed version string.
+ *
+ * Revision 1.18  1994/11/16 13:38:00  cmb
+ * Added debugging information; tracked down bug when long filenames were
+ * around that screwed up the output.
+ *
  * Revision 1.17  1994/11/09 16:53:50  cmb
  * Changes to allow files to be read from the command line completed, including
  * facility to note files given on command line that don't exist.
@@ -115,7 +122,28 @@
 #endif
 
 #ifndef FILENAME_MAX
-#define FILENAME_MAX _POSIX_NAME_MAX
+#define FILENAME_MAX 255	/* It needs to be reasonably long - this is
+				 * really just a working guess...
+				 */
+#endif
+
+/*----------------------------------------------------------------------
+ *	Debugging macro
+ *
+ *	Note that the use of the __FUNCTION__ variable and the varargs
+ *	macro is a GCC specific feature and is non-portable to other
+ *	compilers. Note also can't use in an unprotected 'if' stmt.
+ *----------------------------------------------------------------------*/
+
+#ifdef __GNUC__
+#define report(args...)\
+if (g_debug) \
+{ \
+	  fprintf(g_debug_file,"%20s : %5d : ", __FUNCTION__, __LINE__);\
+	  fprintf(g_debug_file, ## args);\
+}
+#else
+#define report if (g_debug) printf
 #endif
 
 /*----------------------------------------------------------------------
@@ -308,7 +336,12 @@ int	g_changed = false,	/* true => display only changed RCS files */
 	g_unlocked = false,	/*  "   =>    "     "   unlocked RCS  "   */
 	g_dot = false,		/*  "   => also include dot files	  */
 	g_fileargs = false,	/* Are there filename arguments?	*/
+	g_debug = false,	/* Do we want debugging information?	*/
 	g_RCSdir = true;	/* Normally an RCS dir is present...	*/
+
+FILE	*g_debug_file;		/* File to which debugging information is
+				 * dumped.
+				 */
 
 char	g_spaces[FILENAME_MAX];	/* Array of spaces... for printing	*/
 
@@ -316,7 +349,7 @@ char	g_spaces[FILENAME_MAX];	/* Array of spaces... for printing	*/
 				 * version number, last bit is generated
 				 * by RCS.
 				 */
-char	g_version[] = "0.2  ($Id: rcsi.c,v 1.17 1994/11/09 16:53:50 cmb Exp $)";
+char	g_version[] = "0.3  ($Id: rcsi.c,v 1.19 1994/11/16 13:38:47 cmb Exp $)";
 
 /*----------------------------------------------------------------------
  *
@@ -334,7 +367,7 @@ void		p_node (Tnode *t);
 void		print_tree (void);
 FileClass	determine_class (char *fname);
 void		read_files (void);
-void		process_filearg(char *fname);
+void		process_filearg (char *fname);
 int		look_for (char *target, FILE *file_p);
 void		skip_to (char *keyword, FILE *rcsfile_p);
 enum markers	trymatch (char const *string);
@@ -346,9 +379,6 @@ int 		match_log (FILE *file_p, int file_c);
 int 		rcsfcmp (register FILE *file_p, register FILE *rcsfile_p);
 void		parse_rcs_file (FILE *rcsfile_p, char *file_name);
 void		sig_handle (int sig);
-
-
-
 
 
 /*----------------------------------------------------------------------
@@ -384,6 +414,9 @@ Tnode *node_insert(char *fname, int length, FileClass class)
 		printf("malloc failed in node_insert\n");
 		exit(-1);
 	}
+
+	report("Inserting %s into tree, class %d, length %d\n", fname, class, 
+	       length);
 
 	/* Store filename length. Keep track of the longest filename.	*/
 
@@ -600,6 +633,8 @@ void p_node(Tnode *t)
 	if (t == NULL) return;
 	p_node(t->lower);
 
+	report("Printing info on file %s\n", t->name);
+	
 	/* To get the spacing right we have a string of spaces. Once we know
 	 * the length of the longest filename and the current one, we write
 	 * an end of string character into the string of spaces to make up
@@ -724,7 +759,10 @@ void p_node(Tnode *t)
 void print_tree(void)
 {
 	int i;
-	
+
+	report("Entering 'print_tree'. Longest filename is %d\n",
+	       tree_longest);
+
 	/* Make sure the spaces array is initialised. This could be
 	 * more sensibly done just once in the program run, at startup.
 	 */
@@ -735,6 +773,7 @@ void print_tree(void)
 	g_spaces[FILENAME_MAX -1] = '\0';
 	
 	p_node(tree_root);
+	report("Leaving 'print_tree'.\n");
 }
 
 /*----------------------------------------------------------------------
@@ -785,7 +824,8 @@ FileClass determine_class(char *fname)
 			exit(-1);
 		}
 	}
-	
+
+	report("'determine_class' returns %d\n", class);	
 	return(class);
 }	
 
@@ -852,6 +892,8 @@ void read_files(void)
 	struct dirent *dire;
 	FileClass class;
 	char pathname[PATH_MAX];
+	
+	report("Reading files from current directory\n");
 	
 	if ((dir = opendir(".")) == NULL)
 	{
@@ -1877,6 +1919,23 @@ int main(int argc, char *argv[])
 		{
 			g_dot = true;
 		}
+		else if (strcmp(argv[current_arg], "--DEBUG") == 0)
+		{
+			/*------------------------------------------------
+			 * Turn on debugging information.
+			 *------------------------------------------------*/
+			g_debug = true;
+			if ((g_debug_file = fopen("/tmp/rcsi.dump", "w")) 
+			    == NULL)
+			{
+				printf("Failed to open debugging log file\n");
+				exit(-1);
+			}
+			fprintf(g_debug_file,"       Function Name : Line  : "
+				"Message\n"
+				"--------------------------------------------"
+				"--------------------------\n");
+		}
 		else if ((strcmp(argv[current_arg], "-h") == 0) ||
 			 (strcmp(argv[current_arg], "--help") == 0))
 		{
@@ -1917,8 +1976,22 @@ int main(int argc, char *argv[])
 	{
 		read_files();
 	}
+	else 
+	{
+		report("Using files on command line\n");
+	}
 	
 	print_tree();
 
+	if (g_debug)
+	{
+		report("Closing debugging file\n");
+		if (fclose(g_debug_file) == EOF)
+		{
+			printf("Failed to close debugging file\n");
+			exit(-1);
+		}
+	}
+	
 	exit(0);
 }
